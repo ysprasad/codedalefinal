@@ -16,14 +16,19 @@ if (!fs.existsSync(MODULES_FILE)) {
 
 export function saveModule(moduleData: any) {
   // Read existing data
-  const existingData = JSON.parse(fs.readFileSync(MODULES_FILE, 'utf-8'));
-  
+  console.log("insavemodule");
+  let existingData = getAllModules();
+  console.log("baby3")
+  if(Object.keys(existingData).length === 0){
+    existingData={};
+     console.log("upadahkdjchn")
+  }
   // Merge new module with existing data
   const updatedData = {
     ...existingData,
     ...moduleData
   };
-  
+  console.log(updatedData);
   // Save to file
   fs.writeFileSync(MODULES_FILE, JSON.stringify(updatedData, null, 2));
   
@@ -32,7 +37,11 @@ export function saveModule(moduleData: any) {
 
 export function getAllModules() {
   if (!fs.existsSync(MODULES_FILE)) {
+    console.log("baby2")
     return {};
   }
-  return JSON.parse(fs.readFileSync(MODULES_FILE, 'utf-8'));
+  console.log("baby")
+  const fileContent=fs.readFileSync(MODULES_FILE, 'utf-8');
+  if(fileContent.trim()==="") return {}
+  return JSON.parse(fileContent);
 }

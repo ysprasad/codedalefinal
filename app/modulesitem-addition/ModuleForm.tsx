@@ -1,7 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { FiPlus, FiTrash2 } from 'react-icons/fi';
+import { useState } from "react";
+import { FiPlus, FiTrash2 } from "react-icons/fi";
+
+import { EditorContent, EditorRoot, JSONContent } from "novel";
 
 interface Chapter {
   name: string;
@@ -15,72 +17,122 @@ interface ModuleData {
   image: string;
   chapters: Chapter[];
 }
+interface ModuleError {
+  title: string;
+  description: string;
+  slug: string;
+  image: string;
+  chapters: string[];
+  chapter: string;
+}
+const TailwindEditor = () => {
+  const [content, setContent] = useState<JSONContent>();
+  return (
+    <EditorRoot>
+      <EditorContent
+        initialContent={content}
+        onUpdate={({ editor }) => {
+          const json = editor.getJSON();
+          setContent(json);
+        }}
+      />
+    </EditorRoot>
+  );
+};
+
 
 export default function ModuleForm() {
   const [formData, setFormData] = useState<ModuleData>({
-    title: '',
-    description: '',
-    slug: '',
-    image: '',
-    chapters: []
+    title: "",
+    description: "",
+    slug: "",
+    image: "",
+    chapters: [],
   });
 
-  const [errors, setErrors] = useState<Partial<ModuleData>>({});
+  const [errors, setErrors] = useState<Partial<ModuleError>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  function validateModuleError(obj: Partial<ModuleError>): boolean {
+    for (const key in obj) {
+      const value = obj[key as keyof ModuleError];
 
+      // Check if the value is null or an empty string
+      if (typeof value === "string" && value?.trim() != "") {
+        return false;
+      }
+
+      // Check if `chapters` is an array and contains empty strings
+      if (
+        Array.isArray(value) &&
+        value.length != 0 &&
+        value.some((item) => item.trim() != "")
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }
   const validateForm = () => {
-    const newErrors: Partial<ModuleData> = {};
+    const newErrors: Partial<ModuleError> = {};
 
-    if (!formData.title) newErrors.title = 'Title is required';
-    if (!formData.description) newErrors.description = 'Description is required';
+    if (!formData.title) newErrors.title = "Title is required";
+    if (!formData.description)
+      newErrors.description = "Description is required";
     if (!formData.slug) {
-      newErrors.slug = 'Slug is required';
+      newErrors.slug = "Slug is required";
     } else if (!/^[a-z0-9-]+$/.test(formData.slug)) {
-      newErrors.slug = 'Slug can only contain lowercase letters, numbers, and hyphens';
+      newErrors.slug =
+        "Slug can only contain lowercase letters, numbers, and hyphens";
     }
     if (!formData.image) {
-      newErrors.image = 'Image URL is required';
+      newErrors.image = "Image URL is required";
     } else if (!/^https:\/\/.+/.test(formData.image)) {
-      newErrors.image = 'Image URL must start with https://';
+      newErrors.image = "Image URL must start with https://";
     }
     if (formData.chapters.length === 0) {
-      newErrors.chapters = 'At least one chapter is required';
+      newErrors.chapter = "At least one chapter is required";
     }
-
+    newErrors.chapters = formData.chapters.map((chapter) => {
+      if (!chapter.name || !chapter.slug) {
+        return "Chapter name and Chapter slug are required";
+      } else {
+        return "";
+      }
+    });
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return validateModuleError(newErrors);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitError(null);
-    
+
     if (validateForm()) {
       try {
         const moduleKey = formData.slug;
         const moduleData = {
           [moduleKey]: {
-            ...formData
-          }
+            ...formData,
+          },
         };
 
         // Save to localStorage for backup
-        localStorage.setItem('moduleData', JSON.stringify(moduleData));
+        localStorage.setItem("moduleData", JSON.stringify(moduleData));
 
         // Save to server
-        const response = await fetch('/api/modules', {
-          method: 'POST',
+        const response = await fetch("/api/modules", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify(moduleData),
         });
 
         if (!response.ok) {
-          throw new Error('Failed to save module');
+          throw new Error("Failed to save module");
         }
 
         setSubmitSuccess(true);
@@ -88,46 +140,53 @@ export default function ModuleForm() {
 
         // Reset form
         setFormData({
-          title: '',
-          description: '',
-          slug: '',
-          image: '',
-          chapters: []
+          title: "",
+          description: "",
+          slug: "",
+          image: "",
+          chapters: [],
         });
       } catch (error) {
-        console.error('Error saving data:', error);
-        setSubmitError('Failed to save module. Please try again.');
+        console.error("Error saving data:", error);
+        setSubmitError("Failed to save module. Please try again.");
       }
     }
     setIsSubmitting(false);
   };
 
   const addChapter = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      chapters: [...prev.chapters, { name: '', slug: '' }]
+      chapters: [...prev.chapters, { name: "", slug: "" }],
     }));
   };
 
   const removeChapter = (index: number) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      chapters: prev.chapters.filter((_, i) => i !== index)
+      chapters: prev.chapters.filter((_, i) => i !== index),
     }));
   };
 
-  const updateChapter = (index: number, field: keyof Chapter, value: string) => {
-    setFormData(prev => ({
+  const updateChapter = (
+    index: number,
+    field: keyof Chapter,
+    value: string
+  ) => {
+    setFormData((prev) => ({
       ...prev,
       chapters: prev.chapters.map((chapter, i) => {
         if (i === index) {
           return {
             ...chapter,
-            [field]: field === 'slug' ? value.toLowerCase().replace(/[^a-z0-9-]/g, '-') : value
+            [field]:
+              field === "slug"
+                ? value.toLowerCase().replace(/[^a-z0-9-]/g, "-")
+                : value,
           };
         }
         return chapter;
-      })
+      }),
     }));
   };
 
@@ -150,23 +209,31 @@ export default function ModuleForm() {
         <input
           type="text"
           value={formData.title}
-          onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, title: e.target.value }))
+          }
           className="form-input"
           placeholder="Enter module title"
         />
-        {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
+        {errors.title && (
+          <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+        )}
       </div>
 
       <div>
         <label className="form-label">Description</label>
         <textarea
           value={formData.description}
-          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, description: e.target.value }))
+          }
           rows={3}
           className="form-input"
           placeholder="Enter module description"
         />
-        {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
+        {errors.description && (
+          <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+        )}
       </div>
 
       <div>
@@ -174,14 +241,18 @@ export default function ModuleForm() {
         <input
           type="text"
           value={formData.slug}
-          onChange={(e) => setFormData(prev => ({ 
-            ...prev, 
-            slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-') 
-          }))}
+          onChange={(e) =>
+            setFormData((prev) => ({
+              ...prev,
+              slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
+            }))
+          }
           className="form-input"
           placeholder="enter-slug-here"
         />
-        {errors.slug && <p className="mt-1 text-sm text-red-600">{errors.slug}</p>}
+        {errors.slug && (
+          <p className="mt-1 text-sm text-red-600">{errors.slug}</p>
+        )}
       </div>
 
       <div>
@@ -189,11 +260,15 @@ export default function ModuleForm() {
         <input
           type="url"
           value={formData.image}
-          onChange={(e) => setFormData(prev => ({ ...prev, image: e.target.value }))}
+          onChange={(e) =>
+            setFormData((prev) => ({ ...prev, image: e.target.value }))
+          }
           className="form-input"
           placeholder="https://example.com/image.jpg"
         />
-        {errors.image && <p className="mt-1 text-sm text-red-600">{errors.image}</p>}
+        {errors.image && (
+          <p className="mt-1 text-sm text-red-600">{errors.image}</p>
+        )}
       </div>
 
       <div>
@@ -207,10 +282,13 @@ export default function ModuleForm() {
             <FiPlus className="mr-2" /> Add Chapter
           </button>
         </div>
-        
+
         <div className="space-y-4">
           {formData.chapters.map((chapter, index) => (
-            <div key={index} className="flex gap-4 items-start p-4 rounded-lg bg-gray-50">
+            <div
+              key={index}
+              className="flex gap-4 items-start p-4 rounded-lg bg-gray-50"
+            >
               <div className="flex-1 space-y-3">
                 <div>
                   <label className="form-label text-xs">Chapter Name</label>
@@ -218,7 +296,9 @@ export default function ModuleForm() {
                     type="text"
                     placeholder="Enter chapter name"
                     value={chapter.name}
-                    onChange={(e) => updateChapter(index, 'name', e.target.value)}
+                    onChange={(e) =>
+                      updateChapter(index, "name", e.target.value)
+                    }
                     className="form-input"
                   />
                 </div>
@@ -228,10 +308,20 @@ export default function ModuleForm() {
                     type="text"
                     placeholder="chapter-slug"
                     value={chapter.slug}
-                    onChange={(e) => updateChapter(index, 'slug', e.target.value)}
+                    onChange={(e) =>
+                      updateChapter(index, "slug", e.target.value)
+                    }
                     className="form-input"
                   />
                 </div>
+
+                <TailwindEditor />
+
+                {errors?.chapters?.[index] && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {errors?.chapters?.[index]}
+                  </p>
+                )}
               </div>
               <button
                 type="button"
@@ -245,7 +335,9 @@ export default function ModuleForm() {
             </div>
           ))}
         </div>
-        {errors.chapters && <p className="mt-1 text-sm text-red-600">{errors.chapters}</p>}
+        {errors.chapter && (
+          <p className="mt-1 text-sm text-red-600">{errors.chapter}</p>
+        )}
       </div>
 
       <div className="pt-6">
@@ -256,14 +348,30 @@ export default function ModuleForm() {
         >
           {isSubmitting ? (
             <>
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              <svg
+                className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
               </svg>
               Submitting...
             </>
           ) : (
-            'Submit'
+            "Submit"
           )}
         </button>
       </div>
